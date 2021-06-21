@@ -19,9 +19,9 @@ contract UpgradeabilityProxy is Proxy {
 
     /**
      * @dev Storage slot with the address of the current implementation.
-     * This is the keccak-256 hash of "infinigold.proxy.implementation", and is validated in the constructor.
+     * This is the keccak-256 hash of "speedProp0621.proxy.implementation", and is validated in the constructor.
      */
-    bytes32 private constant IMPLEMENTATION_SLOT = 0x17a1a1520654e435f06928e17f36680bf83a0dd9ed240ed37d78f8289a559c70;
+    bytes32 private constant IMPLEMENTATION_SLOT = 0x43f18ae19f743138a282f721d6d3302f79cf3dd6b85c8ebf432f3770f179e9f4;
 
     /**
      * @dev Contract constructor.
@@ -29,7 +29,7 @@ contract UpgradeabilityProxy is Proxy {
      * @param _implementation Address of the initial implementation.
      */
     constructor(address _implementation) public {
-        assert(IMPLEMENTATION_SLOT == keccak256("infinigold.proxy.implementation"));
+        assert(IMPLEMENTATION_SLOT == keccak256("speedProp0621.proxy.implementation"));
 
         _setImplementation(_implementation);
     }
