@@ -21,10 +21,9 @@ contract AdminUpgradeabilityProxy is UpgradeabilityProxy {
 
     /**
      * @dev Storage slot with the admin of the contract.
-     * This is the keccak-256 hash of "infinigold.proxy.admin", and is validated in the constructor.
+     * This is the keccak-256 hash of "speedProp0621.proxy.admin", and is validated in the constructor.
      */
-    bytes32 private constant ADMIN_SLOT = 0x0d28943014d3bfed6af9cab5e6024c23fa2da10f7a6373bcd56c37313c24d93a;
-
+    bytes32 private constant ADMIN_SLOT = 0x530e01f27a787e2c3826380bb112de776629452162ba6db1ff9b4baa5703537d;
     /**
      * @dev Modifier to check whether the `msg.sender` is the admin.
      * If it is, it will run the function. Otherwise, it will delegate the call to the implementation.
@@ -44,7 +43,7 @@ contract AdminUpgradeabilityProxy is UpgradeabilityProxy {
      * @param _implementation address of the initial implementation.
      */
     constructor(address _implementation) UpgradeabilityProxy(_implementation) public {
-        assert(ADMIN_SLOT == keccak256("infinigold.proxy.admin"));
+        assert(ADMIN_SLOT == keccak256("speedProp0621.proxy.admin"));
 
         _setAdmin(msg.sender);
     }
