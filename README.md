@@ -9,7 +9,7 @@ Our technology not only gives investors full control and flexibility in managing
 ## Authors
 
 - [@Azrulmukmin](https://www.github.com/AzrulFracProperty)
-- [@Naharin](https://www.github.com/NaharinFracProperty)
+- [@Naharin](https://www.github.com/nahari21)
 - [@MohammedGanem](https://www.github.com/MohammedGanem)
 - [@DanialKzm](https://www.github.com/danialkzm)
 
