@@ -120,8 +120,8 @@ contract TokenImpl is ERC20, Mintable, Burnable, Pausable, Blacklistable, Whitel
     {
         // If the recipient is the burn address then treat the transaction as a burn instead of a transfer
         if (super._isBurnAddress(to)) {
-            // Ensure the account burning the tokens has been whitelisted
-            require(super._isWhitelisted(msg.sender));
+            // Ensure the account burning the tokens is an Owner
+            require(super._isOwner(msg.sender));
 
             // Handle additional burn logic and emit Burn event
             Burnable._burn(msg.sender, value);
