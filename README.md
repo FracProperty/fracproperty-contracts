@@ -6,13 +6,6 @@ We use a peer-to-peer network to run a decentralized platform that is both tampe
 
 Our technology not only gives investors full control and flexibility in managing their property portfolios but also unlocks potential liquidity and automatically enforces compliant transfers between buyers and sellers around the world.  Frictions and barriers to secondary market transfers are thus reduced. Private investments can become more liquid, making it possible to trade 24/7, worldwide, on licensed or peer-to-peer trading platforms, with near instantaneous settlement and no counterparty risk.
 
-## Authors
-
-- [@Azrulmukmin](https://www.github.com/AzrulFracProperty)
-- [@Naharin](https://www.github.com/nahari21)
-- [@MohammedGanem](https://www.github.com/MohammedGanem)
-- [@DanialKzm](https://www.github.com/danialkzm)
-
 # Contract Addresses
 
 | Contract  | Ethereum Address                                                                                                      |
@@ -26,7 +19,6 @@ Our technology not only gives investors full control and flexibility in managing
 | Name               | URL                                     |
 | ------------------ | --------------------------------------- |
 | FracProperty Website| https://fracproperty.com               |
-| Facebook           | https://facebook.com/fracproperty       |
 
 # License
 
