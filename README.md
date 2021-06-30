@@ -12,7 +12,7 @@ Our technology not only gives investors full control and flexibility in managing
 | --------- | --------------------------------------------------------------------------------------------------------------------- |
 | Frac      | [0x442Ea72e5303bFaB6b4c7BA84ff0D3E66Edc5Cd5](https://bscscan.com/address/0x442ea72e5303bfab6b4c7ba84ff0d3e66edc5cd5) |
 | Blacklist | [0xAB7104a839C86e6Fd1Ea4E4a1238833A717848ea](https://bscscan.com/address/0xAB7104a839C86e6Fd1Ea4E4a1238833A717848ea) |
-| Whitelist | [0x26c16Df575b1306897E50c1088B42B1b899b0452](https://bscscan.com/address/0x26c16Df575b1306897E50c1088B42B1b899b0452) |
+| Whitelist | [0x9fF7b773DF53355C1d959254895040a7048c8874](https://bscscan.com/address/0x9fF7b773DF53355C1d959254895040a7048c8874) |
 
 # Links
 
