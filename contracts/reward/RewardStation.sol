@@ -997,6 +997,7 @@ contract rewardStation is Ownable, Pausable {
     function claim(uint256 _rewardsAmount, uint256 nonce, bytes memory sig) public notContract {
         
         require(whiteList.onList(msg.sender) ,"The address to be rewarded is not whiteListed");
+        require(_rewardsAmount<MAX_REWARD_AMOUNT ,"The rewarded amount axceeds the maximum limit");
         
         UserInfo storage user = userInfo[msg.sender];
         
@@ -1031,6 +1032,7 @@ contract rewardStation is Ownable, Pausable {
         
         require(whiteList.onList(msg.sender) ,"The address to be rewarded is not whiteListed");
         require(whiteList.onList(_referral) ,"The referral is not whiteListed");
+        require(_rewardsAmount<MAX_REWARD_AMOUNT ,"The rewarded amount axceeds the maximum limit");
 
         UserInfo storage user = userInfo[msg.sender];
 
