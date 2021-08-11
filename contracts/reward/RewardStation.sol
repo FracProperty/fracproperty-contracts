@@ -11,7 +11,7 @@ pragma solidity >=0.6.0 <0.8.0;
  * via msg.sender and msg.data, they should not be accessed in such a direct
  * manner, since when dealing with GSN meta-transactions the account sending and
  * paying for execution may not be the actual sender (as far as an application
- * is concerned).
+ * is concerned).   
  *
  * This contract is only required for intermediate, library-like contracts.
  */
@@ -323,6 +323,9 @@ interface WhiteList {
 
 }
 
+
+
+
 // File: @openzeppelin/contracts/token/ERC20/IERC20.sol
 
 pragma solidity >=0.6.0 <0.8.0;
@@ -622,101 +625,7 @@ library Address {
     }
 }
 
-// File: @openzeppelin/contracts/token/ERC20/SafeERC20.sol
 
-pragma solidity >=0.6.0 <0.8.0;
-
-/**
- * @title SafeERC20
- * @dev Wrappers around ERC20 operations that throw on failure (when the token
- * contract returns false). Tokens that return no value (and instead revert or
- * throw on failure) are also supported, non-reverting calls are assumed to be
- * successful.
- * To use this library you can add a `using SafeERC20 for IERC20;` statement to your contract,
- * which allows you to call the safe operations as `token.safeTransfer(...)`, etc.
- */
-library SafeERC20 {
-    using SafeMath for uint256;
-    using Address for address;
-
-    function safeTransfer(
-        IERC20 token,
-        address to,
-        uint256 value
-    ) internal {
-        _callOptionalReturn(token, abi.encodeWithSelector(token.transfer.selector, to, value));
-    }
-
-    function safeTransferFrom(
-        IERC20 token,
-        address from,
-        address to,
-        uint256 value
-    ) internal {
-        _callOptionalReturn(token, abi.encodeWithSelector(token.transferFrom.selector, from, to, value));
-    }
-
-    /**
-     * @dev Deprecated. This function has issues similar to the ones found in
-     * {IERC20-approve}, and its usage is discouraged.
-     *
-     * Whenever possible, use {safeIncreaseAllowance} and
-     * {safeDecreaseAllowance} instead.
-     */
-    function safeApprove(
-        IERC20 token,
-        address spender,
-        uint256 value
-    ) internal {
-        // safeApprove should only be called when setting an initial allowance,
-        // or when resetting it to zero. To increase and decrease it, use
-        // 'safeIncreaseAllowance' and 'safeDecreaseAllowance'
-        // solhint-disable-next-line max-line-length
-        require(
-            (value == 0) || (token.allowance(address(this), spender) == 0),
-            "SafeERC20: approve from non-zero to non-zero allowance"
-        );
-        _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, value));
-    }
-
-    function safeIncreaseAllowance(
-        IERC20 token,
-        address spender,
-        uint256 value
-    ) internal {
-        uint256 newAllowance = token.allowance(address(this), spender).add(value);
-        _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
-    }
-
-    function safeDecreaseAllowance(
-        IERC20 token,
-        address spender,
-        uint256 value
-    ) internal {
-        uint256 newAllowance =
-            token.allowance(address(this), spender).sub(value, "SafeERC20: decreased allowance below zero");
-        _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
-    }
-
-    /**
-     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement
-     * on the return value: the return value is optional (but if data is returned, it must not be false).
-     * @param token The token targeted by the call.
-     * @param data The call data (encoded using abi.encode or one of its variants).
-     */
-    function _callOptionalReturn(IERC20 token, bytes memory data) private {
-        // We need to perform a low level call here, to bypass Solidity's return data size checking mechanism, since
-        // we're implementing it ourselves. We use {Address.functionCall} to perform this call, which verifies that
-        // the target address contains contract code and also asserts for success in the low-level call.
-
-        bytes memory returndata = address(token).functionCall(data, "SafeERC20: low-level call failed");
-        if (returndata.length > 0) {
-            // Return data is optional
-            // solhint-disable-next-line max-line-length
-            require(abi.decode(returndata, (bool)), "SafeERC20: ERC20 operation did not succeed");
-        }
-    }
-}
 
 // File: @openzeppelin/contracts/utils/Pausable.sol
 
@@ -807,12 +716,15 @@ abstract contract Pausable is Context {
     }
 }
 
+
+
 // File: contracts/rewards/rewardStation.sol
 
 pragma solidity 0.6.12;
 
+import "./ECRecovery.sol";
+
 contract rewardStation is Ownable, Pausable {
-    using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
     struct UserInfo {
@@ -821,18 +733,23 @@ contract rewardStation is Ownable, Pausable {
         address referral;   // The address of the user's referral.
         uint256 lastRewardedTime; // keeps track of the reward time.
         uint256 lastUserActionTime; // keeps track of the last user action time
+        
+        bool claimed1stReward;  // check if reward is claimed;
+        uint256 unClaimedReferralRewards; // store total rewards as referralRewards
+
     }
 
     IERC20 public token; // Frac token
     WhiteList public whiteList; // only whitelisted users are eligiable for reward tokens.
     
     mapping(address => UserInfo) public userInfo;
+    mapping(uint256 => bool) usedNonces;
 
     address public admin;   // address of the admin user
     address public mainDistributer; // address of the main pool that holds all the rewards to be given.
     
     
-    /** Whether or not this contract has been initialized. */
+    // Whether or not this contract has been initialized. 
     bool private _initialized;
 
     uint256 public  MAX_REWARD_AMOUNT;          // maximum rewards could be given to a user in a single transaction.
@@ -840,6 +757,8 @@ contract rewardStation is Ownable, Pausable {
 
     uint256 public rewardAmount ; // Fixed reward amount
     uint256 public referralRewardAmount ; // Fixed referral reward amount
+
+    uint256 public value1stReward;
 
 
     /**
@@ -865,6 +784,8 @@ contract rewardStation is Ownable, Pausable {
    
 
     event Claimed(address indexed addr, uint256 amount);
+    event Rewarded(address indexed addr, uint256 amount);
+    event ClaimedWithReferral(address indexed addr, uint256 rewardAmount, address indexed referralAddress, uint256 referralRewardAmount);
     event RewardedWithReferral(address indexed addr, uint256 rewardAmount, address indexed referralAddress, uint256 referralRewardAmount);
     event Pause();
     event Unpause();
@@ -928,6 +849,8 @@ contract rewardStation is Ownable, Pausable {
         _;
     }
 
+
+
     /**
      * @notice Sets admin address
      * @dev Only callable by the contract owner.
@@ -946,6 +869,7 @@ contract rewardStation is Ownable, Pausable {
         mainDistributer = _mainDist;
     }
    
+
     /**
      * @notice Sets WhiteList address
      * @dev Only callable by the contract admin.
@@ -976,6 +900,7 @@ contract rewardStation is Ownable, Pausable {
         MAX_REFERRAL_REWARD_AMOUNT = _maxReferralRewardsAmount;
     }
    
+
     /**
      * @notice Withdraw unexpected tokens sent to the rewards token
      */
@@ -983,7 +908,7 @@ contract rewardStation is Ownable, Pausable {
         require(_token != address(token), "Token cannot be same as deposit token");
         
         uint256 amount = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).safeTransfer(msg.sender, amount);
+        IERC20(_token).transfer(msg.sender, amount);
     }
 
     /**
@@ -1006,6 +931,29 @@ contract rewardStation is Ownable, Pausable {
    
 
     /**
+     * @notice give rewards to an address. All rewards are static values set with the fixed amounts.
+     * @param _addr is the address to be rewarded
+     */
+
+    function reward(address _addr) public notContract onlyAdmin {
+        
+        require(whiteList.onList(_addr) ,"The address to be rewarded is not whiteListed");
+        require(rewardAmount <= token.balanceOf(mainDistributer), "Not enough tokens in the reserve");
+        
+        UserInfo storage user = userInfo[_addr];
+
+        token.transferFrom(mainDistributer, _addr, rewardAmount);
+
+        user.lastUserActionTime = block.timestamp;
+        user.lastRewardedTime = block.timestamp;
+        user.totalrewarded = SafeMath.add(user.totalrewarded, rewardAmount); 
+        
+        emit Rewarded(_addr, rewardAmount);
+    }
+
+
+
+    /**
      * @notice give rewards to an address and rewards its referral address too. All rewards are static values set with the fixed amounts.
 
      * @param _addr is the address to be rewarded
@@ -1016,15 +964,16 @@ contract rewardStation is Ownable, Pausable {
         
         require(whiteList.onList(_addr) ,"The address to be rewarded is not whiteListed");
         require(whiteList.onList(_referral) ,"The referral is not whiteListed");
-
+        require(SafeMath.add(rewardAmount,referralRewardAmount) <= token.balanceOf(mainDistributer), "Not enough tokens in the reserve");
+        
         UserInfo storage user = userInfo[_addr];
 
         require(user.referral  == address(0), "First 'Reward with Referral' has been granted to user!");
 
         UserInfo storage userReferral = userInfo[_referral];
         
-        token.safeTransferFrom(mainDistributer, _addr, rewardAmount);
-        token.safeTransferFrom(mainDistributer, _referral, referralRewardAmount);
+        token.transferFrom(mainDistributer, _addr, rewardAmount);
+        token.transferFrom(mainDistributer, _referral, referralRewardAmount);
         
         user.referral = _referral;
         user.lastUserActionTime = block.timestamp;
@@ -1033,31 +982,115 @@ contract rewardStation is Ownable, Pausable {
         userReferral.totalAsReferralRewarded = SafeMath.add(userReferral.totalAsReferralRewarded, referralRewardAmount); 
         userReferral.lastUserActionTime = block.timestamp;
         
-
         emit RewardedWithReferral(_addr, rewardAmount, _referral, referralRewardAmount);
     }
 
 
     /**
-     * @notice transfer all accumulated amounts of rewards that belongs to an address and claimed by the user. The amount is dynamic and not fixed.
-
-     * @param _addr is the address to be rewarded
+     * @notice transfer all accumulated amounts of rewards that belongs to an address and claimed by the user.
      * @param _rewardsAmount is the amount of claimed accumulated rewards
+     * @param nonce is the transaction ID
+     * @param sig is the siginture generated from the backend system for verification
+     
      */
      
-    function claim(address _addr, uint256 _rewardsAmount) public notContract onlyAdmin {
+    function claim(uint256 _rewardsAmount, uint256 nonce, bytes memory sig) public notContract {
         
-        require(whiteList.onList(_addr) ,"The address to be rewarded is not whiteListed");
+        require(whiteList.onList(msg.sender) ,"The address to be rewarded is not whiteListed");
         
-        UserInfo storage user = userInfo[_addr];
+        UserInfo storage user = userInfo[msg.sender];
         
-        token.safeTransferFrom(mainDistributer, _addr, _rewardsAmount);
+        require(_rewardsAmount <= token.balanceOf(mainDistributer), "Not enough tokens in the reserve");
+        
+        // recreates the message that was signed on the client.
+        bytes32 message = hashFun(msg.sender, address(this), _rewardsAmount, nonce);
+        
+        require(ECDSA.recover(message, sig)==admin, "Invalid signature");
+        
+        require(!usedNonces[nonce], "Transaction ID is already Claimed");
+        usedNonces[nonce] = true;
+      
+        token.transferFrom(mainDistributer, msg.sender, _rewardsAmount);
         user.totalrewarded = SafeMath.add(user.totalrewarded, _rewardsAmount); 
         
         user.lastRewardedTime = block.timestamp;
         user.lastUserActionTime = block.timestamp;
-        emit Claimed(_addr, _rewardsAmount);
+        emit Claimed(msg.sender, _rewardsAmount);
     }
+
+
+    /**
+     * @notice transfer all accumulated amounts of rewards that belongs to an address and claimed by the user. and also, reward the mentioned referral.
+     * @param _rewardsAmount is the amount of claimed accumulated rewards
+     * @param nonce is the transaction ID
+     * @param sig is the siginture generated from the backend system for verification
+     * @param _referral is the address of the referral to be rewarded.
+     */
+     
+    function claimWithReferral(uint256 _rewardsAmount, uint256 nonce, bytes memory sig,  address _referral) public notContract {
+        
+        require(whiteList.onList(msg.sender) ,"The address to be rewarded is not whiteListed");
+        require(whiteList.onList(_referral) ,"The referral is not whiteListed");
+
+        UserInfo storage user = userInfo[msg.sender];
+
+        require(user.referral  == address(0), "First 'Reward with Referral' has been granted to user!");
+
+        require(_rewardsAmount <= token.balanceOf(mainDistributer), "Not enough tokens in the reserve");
+        
+        // recreates the message that was signed on the client.
+        bytes32 message = hashFun(msg.sender, address(this), _rewardsAmount, nonce);
+        
+        require(ECDSA.recover(message, sig)==admin, "Invalid signature");
+        require(!usedNonces[nonce], "Transaction ID is already Claimed");
+        
+        usedNonces[nonce] = true;
+        
+        token.transferFrom(mainDistributer, msg.sender, _rewardsAmount);
+        token.transferFrom(mainDistributer, _referral, referralRewardAmount);
+
+        user.totalrewarded = SafeMath.add(user.totalrewarded, _rewardsAmount); 
+        user.lastRewardedTime = block.timestamp;
+        user.lastUserActionTime = block.timestamp;
+
+        UserInfo storage userReferral = userInfo[_referral];
+        userReferral.totalAsReferralRewarded = SafeMath.add(userReferral.totalAsReferralRewarded, referralRewardAmount); 
+        userReferral.lastRewardedTime = block.timestamp;
+        userReferral.lastUserActionTime = block.timestamp;
+
+        emit ClaimedWithReferral(msg.sender, rewardAmount, _referral, referralRewardAmount);
+    }
+
+    function hashFun (address receiver, address poolContract, uint256 amount, uint256 nonce) public pure returns (bytes32)
+    {
+        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+        return keccak256(abi.encode(prefix, keccak256(abi.encode(receiver, poolContract, amount, nonce))));
+    }
+
+
+
+    /*
+    function claimIt() public notContract {
+        
+        require(whiteList.onList(msg.sender) ,"The address to be rewarded is not whiteListed");
+        
+        UserInfo storage user = userInfo[msg.sender];
+        
+        uint256 _rewardsAmount = overAllRewardsToClaim();
+        
+        require(_rewardsAmount>0, "user has rewards to be claimed!");
+        
+        token.safeTransferFrom(mainDistributer, msg.sender, _rewardsAmount);
+        user.totalrewarded = SafeMath.add(user.totalrewarded, _rewardsAmount); 
+        user.claimed1stReward = true;
+        
+        user.lastRewardedTime = block.timestamp;
+        user.lastUserActionTime = block.timestamp;
+        emit Claimed(msg.sender, _rewardsAmount);
+    }
+
+*/
+
 
     /**
      * @notice Checks if address is a contract
