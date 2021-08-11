@@ -768,7 +768,7 @@ contract rewardStation is Ownable, Pausable {
      */
     function setRewardAmount(uint256 _rewardsAmount) external onlyOwner {
         require(_rewardsAmount <= MAX_REWARD_AMOUNT, "Reward amount exceeds limit");
-        rewardAmount = _rewardsAmount * 10 ** uint256(18); 
+        rewardAmount = _rewardsAmount ; 
     }
 
     /**
@@ -779,7 +779,7 @@ contract rewardStation is Ownable, Pausable {
     
     function setReferralRewardAmount(uint256 _referralRewardAmount) external onlyOwner {
         require(_referralRewardAmount <= MAX_REFERRAL_REWARD_AMOUNT, "Referral reward amount exceeds limit");
-        referralRewardAmount = _referralRewardAmount * 10 ** uint256(18); 
+        referralRewardAmount = _referralRewardAmount ; 
     }
    
 
