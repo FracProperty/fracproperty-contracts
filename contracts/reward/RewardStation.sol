@@ -935,7 +935,7 @@ contract rewardStation is Ownable, Pausable {
      * @param _addr is the address to be rewarded
      */
 
-    function reward(address _addr) public notContract onlyAdmin {
+    function reward(address _addr) external notContract onlyAdmin {
         
         require(whiteList.onList(_addr) ,"The address to be rewarded is not whiteListed");
         require(rewardAmount <= token.balanceOf(mainDistributer), "Not enough tokens in the reserve");
@@ -960,7 +960,7 @@ contract rewardStation is Ownable, Pausable {
      * @param _referral is the referral address that would be rewarded too
      */
 
-    function rewardWithReferral(address _addr, address _referral) public notContract onlyAdmin {
+    function rewardWithReferral(address _addr, address _referral) external notContract onlyAdmin {
         
         require(whiteList.onList(_addr) ,"The address to be rewarded is not whiteListed");
         require(whiteList.onList(_referral) ,"The referral is not whiteListed");
@@ -995,7 +995,7 @@ contract rewardStation is Ownable, Pausable {
      
      */
      
-    function claim(uint256 _rewardsAmount, uint256 nonce, bytes memory sig) public notContract {
+    function claim(uint256 _rewardsAmount, uint256 nonce, bytes memory sig) external notContract {
         
         require(whiteList.onList(msg.sender) ,"The address to be rewarded is not whiteListed");
         require(_rewardsAmount<MAX_REWARD_AMOUNT ,"The rewarded amount axceeds the maximum limit");
@@ -1029,7 +1029,7 @@ contract rewardStation is Ownable, Pausable {
      * @param _referral is the address of the referral to be rewarded.
      */
      
-    function claimWithReferral(uint256 _rewardsAmount, uint256 nonce, bytes memory sig,  address _referral) public notContract {
+    function claimWithReferral(uint256 _rewardsAmount, uint256 nonce, bytes memory sig,  address _referral) external notContract {
         
         require(whiteList.onList(msg.sender) ,"The address to be rewarded is not whiteListed");
         require(whiteList.onList(_referral) ,"The referral is not whiteListed");
@@ -1073,7 +1073,7 @@ contract rewardStation is Ownable, Pausable {
 
 
     /*
-    function claimIt() public notContract {
+    function claimIt() external notContract {
         
         require(whiteList.onList(msg.sender) ,"The address to be rewarded is not whiteListed");
         
