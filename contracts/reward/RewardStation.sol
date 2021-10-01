@@ -976,6 +976,7 @@ contract rewardStation is Ownable, Pausable {
         token.transferFrom(mainDistributer, _referral, referralRewardAmount);
         
         user.referral = _referral;
+        user.lastRewardedTime = block.timestamp;
         user.lastUserActionTime = block.timestamp;
         
         user.totalrewarded = SafeMath.add(user.totalrewarded, rewardAmount); 
