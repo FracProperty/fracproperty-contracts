@@ -62,7 +62,7 @@ contract ERC20 is IERC20 {
      * @param to The address to transfer to.
      * @param value The amount to be transferred.
      */
-    function transfer(address to, uint256 value) external returns (bool) {
+    function transfer(address to, uint256 value) public returns (bool) {
         _transfer(msg.sender, to, value);
         return true;
     }
@@ -83,7 +83,7 @@ contract ERC20 is IERC20 {
      * @param spender The address which will spend the funds.
      * @param value The amount of tokens to be spent.
      */
-    function approve(address spender, uint256 value) external returns (bool) {
+    function approve(address spender, uint256 value) public returns (bool) {
         _approve(msg.sender, spender, value);
         return true;
     }
@@ -98,7 +98,7 @@ contract ERC20 is IERC20 {
      * @param to address The address which you want to transfer to
      * @param value uint256 the amount of tokens to be transferred
      */
-    function transferFrom(address from, address to, uint256 value) external returns (bool) {
+    function transferFrom(address from, address to, uint256 value) public returns (bool) {
         _transfer(from, to, value);
         _approve(from, msg.sender, _allowed[from][msg.sender].sub(value));
         return true;
@@ -115,7 +115,7 @@ contract ERC20 is IERC20 {
      * @param spender The address which will spend the funds.
      * @param addedValue The amount of tokens to increase the allowance by.
      */
-    function increaseAllowance(address spender, uint256 addedValue) external returns (bool) {
+    function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
         _approve(msg.sender, spender, _allowed[msg.sender][spender].add(addedValue));
         return true;
     }
@@ -131,7 +131,7 @@ contract ERC20 is IERC20 {
      * @param spender The address which will spend the funds.
      * @param subtractedValue The amount of tokens to decrease the allowance by.
      */
-    function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool) {
+    function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
         _approve(msg.sender, spender, _allowed[msg.sender][spender].sub(subtractedValue));
         return true;
     }
