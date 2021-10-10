@@ -1064,7 +1064,7 @@ contract rewardStation is Ownable, Pausable {
         emit ClaimedWithReferral(msg.sender, rewardAmount, _referral, referralRewardAmount);
     }
 
-    function hashFun (address receiver, address poolContract, uint256 amount, uint256 nonce) public pure returns (bytes32)
+    function hashFun (address receiver, address poolContract, uint256 amount, uint256 nonce) internal pure returns (bytes32)
     {
         bytes memory prefix = "\x19Ethereum Signed Message:\n32";
         return keccak256(abi.encode(prefix, keccak256(abi.encode(receiver, poolContract, amount, nonce))));
