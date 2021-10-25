@@ -46,7 +46,10 @@ bytes32 private currentTxHash;
 mapping (address => mapping(uint256 => bool)) private txApproved;
 mapping (uint256 => uint256) private txApprovals;
 mapping (uint256 => TxInfo) private txInfo; 
-bool private nothingToApprove;
+bool private nothingToApproveOrExecute;
+string private constant txStatusApproved="A";
+mapping(uint256 => uint256) public lockTime;
+uint private lockTimePeriod;
 
 
 /**
@@ -56,7 +59,8 @@ bool private nothingToApprove;
       address[] memory initOwners = new address[](1);
       initOwners[0] = msg.sender;
       setupOwners(initOwners,1);
-      nothingToApprove = true;
+      nothingToApproveOrExecute = true;
+      lockTimePeriod = 1;
       nonce = 0;
   }
 
@@ -72,9 +76,19 @@ bool private nothingToApprove;
     event ApproveTransaction(address _by, address _to, string _txDesc, address _txRelatedTo);
 
     /**
+     * @dev Emitted when a transaction is executed
+     */
+    event ExecuteTransaction(address _by, address _to, string _txDesc, address _txRelatedTo);
+
+    /**
      * @dev Emitted when a transaction is cancelled
      */
     event CancelCurrentTransaction(address _by, address _to, string _txDesc, address _txRelatedTo);
+
+    /**
+     * @dev Emitted when a transaction is cancelled
+     */
+    event SetLocktimePeriod(address _by, uint256 _periodInMinutes);
 
 
 
@@ -96,6 +110,24 @@ bool private nothingToApprove;
     }
 
 
+
+    /**
+     * @dev set lockTime period.
+     *
+     * 
+     * Emits an {SetLocktimePeriod} event indicating that a locktime period has been changed.
+     *
+     * @param _periodInMinutes The new value for locktime in minutes.
+     * 
+     */
+    
+    function setLocktimePeriod(uint256 _periodInMinutes) external onlyOwner returns(bool _success)
+    {
+        lockTimePeriod = _periodInMinutes;
+        
+        return true;
+    }
+
     /**
      * @dev add new transaction to be approved.
      *
@@ -112,7 +144,7 @@ bool private nothingToApprove;
     
     function addTransactionAndApprove(bytes calldata _data, address _to, string memory _txDesc, string memory _txNote, address _txRelatedTo) external payable onlyOwner returns(bool _success)
     {
-        require(nothingToApprove, "pending transaction is still waiting for approval");
+        require(nothingToApproveOrExecute, "pending transaction is still waiting for approval or execution!");
         bool ret;
         bytes32 txHash = checkHash(msg.sender,_data,_to);
         
@@ -129,27 +161,19 @@ bool private nothingToApprove;
         _tx.txStatus = "P";
         _tx.approvedBy.push(msg.sender);
         _tx.approvals = _tx.approvals+1;
-        
+    
         /* 
-        if only 1 approval is required for a transaction to be executed at the time of adding a new transaction, then 
-        it sould be executed
+        if only 1 approval is required for a transaction  at the time of adding a new transaction, then 
+        it sould be approved
         */
         if(threshold==1)
         {
-            nothingToApprove = true;
-            txApprovals[nonce] = txApprovals[nonce]+1;
-            ret = execute(_to, msg.value, _data, Enum.Operation.Call, gasleft());
-            
             _tx.txStatus = "A";
-            nonce = nonce+1;
+            
+            lockTime[nonce]= block.timestamp + (lockTimePeriod * 60);
         }
-        else
-        {
-            nothingToApprove = false;
-            ret = true;
-        }
-
-        emit AddTransactionAndApprove(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
+        
+        nothingToApproveOrExecute = false;
         
         return ret;
 
@@ -160,7 +184,7 @@ bool private nothingToApprove;
      */
     function pendingForOwnerApproval(address _owner) external view returns(bool)
     {
-        return (!nothingToApprove && (txApproved[_owner][nonce] == false));
+        return (!nothingToApproveOrExecute && (txApproved[_owner][nonce] == false));
     }
 
     /**
@@ -168,7 +192,7 @@ bool private nothingToApprove;
      */
     function isInProcessOfApproval() external view returns(bool)
     {
-        return !nothingToApprove;
+        return !nothingToApproveOrExecute;
     }
     
     
@@ -186,7 +210,7 @@ bool private nothingToApprove;
     function approveTransaction(bytes calldata _data, address _to) external payable onlyOwner returns(bool _success)
     {
         bool ret;
-        require(!nothingToApprove, "no pending transaction is waiting for approval");
+        require(!nothingToApproveOrExecute, "no pending transaction is waiting for approval or execution");
         
         TxInfo storage _tx =  txInfo[nonce];
         bytes32 txHash = checkHash(_tx.addedBy,_data,_to);
@@ -206,10 +230,8 @@ bool private nothingToApprove;
         // if the number of approvals reached the threshold, then execute the function.
         if(threshold>=txApprovals[nonce])
         {
-            ret = execute(_to, msg.value, _data, Enum.Operation.Call, gasleft());
             _tx.txStatus = "A";
-            nothingToApprove = true;
-            nonce = nonce+1;
+            lockTime[nonce]= block.timestamp + (lockTimePeriod * 60);
         }
 
         emit ApproveTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
@@ -226,11 +248,11 @@ bool private nothingToApprove;
      * Emits a {CancelCurrentTransaction} event indicating that the pending transaction is cancelled.
      * 
      */
-    function cancelCurrentTransaction() external payable onlyOwner returns(bool _success)
+    function cancelCurrentTransaction() external onlyOwner returns(bool _success)
     {
-        require(!nothingToApprove, "no pending transaction is waiting for approval");
+        require(!nothingToApproveOrExecute, "no pending transaction is waiting for approval or execution");
 
-        nothingToApprove = true;
+        nothingToApproveOrExecute = true;
         TxInfo storage _tx =  txInfo[nonce];
         _tx.txStatus = "C";
         
@@ -250,5 +272,59 @@ bool private nothingToApprove;
         return _tx;
     }
     
+    /**
+     * @dev returns information about a lockTime
+     */
+    function getCurrentTimeInfo(uint _nonce) external view returns(uint256 _timeStamp, uint256 _lockTimePeriod,uint256 _lockTime)
+    {
+        return (block.timestamp,lockTimePeriod,lockTime[_nonce]);
+        
+    }
+    
+
+
+    /**
+     * @dev execute the approved transaction.
+     *
+     * 
+     * Emits an {ExecuteTransaction} event indicating that the pending transaction is executed by an owner.
+     *
+     * @param _data the ABI encoding of the function to be executed
+     * @param _to the address of the contract that contains the function to be executed
+     * 
+     */
+
+    function executeTransaction(bytes calldata _data, address _to) external payable onlyOwner returns(bool _success)
+    {
+        require(!nothingToApproveOrExecute, "no pending transaction is waiting for approval");
+        
+        TxInfo storage _tx =  txInfo[nonce];
+        bytes32 txHash = checkHash(_tx.addedBy,_data,_to);
+
+        require((currentTxHash==txHash), "This transaction is not the current transaction for approval or ecexution!");
+
+        require((keccak256(abi.encode(_tx.txStatus))==keccak256(abi.encode(txStatusApproved))), "This transaction is not in 'Approved' stage!");
+    
+        require(block.timestamp > lockTime[nonce], "lock time has not expired");
+    
+        bool ret;
+        
+
+            nothingToApproveOrExecute = true;
+            txApprovals[nonce] = txApprovals[nonce]+1;
+            ret = execute(_to, msg.value, _data, Enum.Operation.Call, gasleft());
+            
+            // change status to 'E': "executed"
+            _tx.txStatus = "E";
+            
+            nonce = nonce+1;
+
+
+        emit ExecuteTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
+        
+        
+        return ret;
+    }
+
         
 }
