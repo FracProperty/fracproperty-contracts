@@ -60,7 +60,7 @@ uint private lockTimePeriod;
       initOwners[0] = msg.sender;
       setupOwners(initOwners,1);
       nothingToApproveOrExecute = true;
-      lockTimePeriod = 1;
+      lockTimePeriod = 172800;
       nonce = 0;
   }
 
