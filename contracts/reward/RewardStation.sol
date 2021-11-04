@@ -733,6 +733,8 @@ contract rewardStation is Ownable, Pausable {
         address referral;   // The address of the user's referral.
         uint256 lastRewardedTime; // keeps track of the reward time.
         uint256 lastUserActionTime; // keeps track of the last user action time
+        uint256 lastRewardDay; // keeps track of the last user reward day
+        uint256 todaysWithrawals; // keeps track of the daily withdrawals
         
         bool claimed1stReward;  // check if reward is claimed;
         uint256 unClaimedReferralRewards; // store total rewards as referralRewards
@@ -758,9 +760,9 @@ contract rewardStation is Ownable, Pausable {
     uint256 public rewardAmount ; // Fixed reward amount
     uint256 public referralRewardAmount ; // Fixed referral reward amount
 
-    uint256 public value1stReward;
-
-
+    uint256 private dailyLimit;
+    uint256 private dailyLimitPeriod;
+    
     /**
      * @dev To set the fixed amount of given rewards.
      *
@@ -780,6 +782,27 @@ contract rewardStation is Ownable, Pausable {
     function setReferralRewardAmount(uint256 _referralRewardAmount) external onlyOwner {
         require(_referralRewardAmount <= MAX_REFERRAL_REWARD_AMOUNT, "Referral reward amount exceeds limit");
         referralRewardAmount = _referralRewardAmount ; 
+    }
+
+
+    /**
+     * @dev To set the amount of allowd withdrawal daily amount
+     *
+     * @param _limit is the value to be set as daily limit
+     */
+    function setDailyLimit(uint256 _limit) external onlyOwner {
+        require(_limit > 0, "limit must be greater than zero.");
+        dailyLimit = _limit ; 
+    }
+
+    /**
+     * @dev To set the period of time-based allowd withdrawals
+     *
+     * @param _t is the period in seconds to be set
+     */
+    function setwithrawalPeriod(uint256 _t) external onlyOwner {
+        require(_t > 0, "period must be greater than zero.");
+        dailyLimitPeriod = _t ; 
     }
    
 
@@ -1001,6 +1024,20 @@ contract rewardStation is Ownable, Pausable {
         require(_rewardsAmount<MAX_REWARD_AMOUNT ,"The rewarded amount axceeds the maximum limit");
         
         UserInfo storage user = userInfo[msg.sender];
+
+        
+        //-----2021-11-02------To set daily limits------------------------
+        uint256 dateDiff;
+        dateDiff = SafeMath.sub(block.timestamp,user.lastRewardDay);
+       if(dateDiff>dailyLimitPeriod)
+        {
+            user.todaysWithrawals = 0;
+            user.lastRewardDay = block.timestamp;
+        }
+        
+        require(SafeMath.add(user.todaysWithrawals,_rewardsAmount)<dailyLimit, "with this amount you would acceed the daily limit! Please decrease the amount or contact SpeedProp.");
+        //----------------------------------------------------------------
+        
         
         require(_rewardsAmount <= token.balanceOf(mainDistributer), "Not enough tokens in the reserve");
         
@@ -1014,6 +1051,7 @@ contract rewardStation is Ownable, Pausable {
       
         token.transferFrom(mainDistributer, msg.sender, _rewardsAmount);
         user.totalrewarded = SafeMath.add(user.totalrewarded, _rewardsAmount); 
+        user.todaysWithrawals = SafeMath.add(user.todaysWithrawals, _rewardsAmount); 
         
         user.lastRewardedTime = block.timestamp;
         user.lastUserActionTime = block.timestamp;
@@ -1039,6 +1077,22 @@ contract rewardStation is Ownable, Pausable {
 
         require(user.referral  == address(0), "First 'Reward with Referral' has been granted to user!");
 
+
+        
+        //-----2021-11-02------To set daily limits------------------------
+        uint256 dateDiff;
+        dateDiff = SafeMath.sub(block.timestamp,user.lastRewardDay);
+       if(dateDiff>dailyLimitPeriod)
+        {
+            user.todaysWithrawals = 0;
+            user.lastRewardDay = block.timestamp;
+        }
+        
+        require(SafeMath.add(user.todaysWithrawals,_rewardsAmount)<dailyLimit, "with this amount you would acceed the daily limit! Please decrease the amount or contact SpeedProp.");
+        //----------------------------------------------------------------
+        
+
+
         require(_rewardsAmount <= token.balanceOf(mainDistributer), "Not enough tokens in the reserve");
         
         // recreates the message that was signed on the client.
@@ -1053,6 +1107,8 @@ contract rewardStation is Ownable, Pausable {
         token.transferFrom(mainDistributer, _referral, referralRewardAmount);
 
         user.totalrewarded = SafeMath.add(user.totalrewarded, _rewardsAmount); 
+        user.todaysWithrawals = SafeMath.add(user.todaysWithrawals, _rewardsAmount); 
+        
         user.lastRewardedTime = block.timestamp;
         user.lastUserActionTime = block.timestamp;
 
@@ -1069,30 +1125,6 @@ contract rewardStation is Ownable, Pausable {
         bytes memory prefix = "\x19Ethereum Signed Message:\n32";
         return keccak256(abi.encode(prefix, keccak256(abi.encode(receiver, poolContract, amount, nonce))));
     }
-
-
-
-    /*
-    function claimIt() external notContract {
-        
-        require(whiteList.onList(msg.sender) ,"The address to be rewarded is not whiteListed");
-        
-        UserInfo storage user = userInfo[msg.sender];
-        
-        uint256 _rewardsAmount = overAllRewardsToClaim();
-        
-        require(_rewardsAmount>0, "user has rewards to be claimed!");
-        
-        token.safeTransferFrom(mainDistributer, msg.sender, _rewardsAmount);
-        user.totalrewarded = SafeMath.add(user.totalrewarded, _rewardsAmount); 
-        user.claimed1stReward = true;
-        
-        user.lastRewardedTime = block.timestamp;
-        user.lastUserActionTime = block.timestamp;
-        emit Claimed(msg.sender, _rewardsAmount);
-    }
-
-*/
 
 
     /**
