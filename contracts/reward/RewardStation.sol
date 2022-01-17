@@ -794,6 +794,14 @@ contract rewardStation is Ownable, Pausable {
         require(_limit > 0, "limit must be greater than zero.");
         dailyLimit = _limit ; 
     }
+    
+    /**
+     * @dev To get the amount of allowd withdrawal daily amount
+     */
+    function getDailyLimit() external view returns  (uint256)
+    {
+        return dailyLimit; 
+    }
 
     /**
      * @dev To set the period of time-based allowd withdrawals
@@ -803,6 +811,22 @@ contract rewardStation is Ownable, Pausable {
     function setwithrawalPeriod(uint256 _t) external onlyOwner {
         require(_t > 0, "period must be greater than zero.");
         dailyLimitPeriod = _t ; 
+    }
+    
+    /**
+     * @dev To get the period of time-based allowd withdrawals
+     */
+    function getWithrawalPeriod() external view returns (uint256) 
+    {
+        return dailyLimitPeriod;
+    }
+
+    /**
+     * @dev To get the today's limit for a given user by his/her address
+     */
+    function getUserDailyLimit(address _userAddress) external view returns (uint256) 
+    {
+        return userInfo[_userAddress].todaysWithrawals;
     }
    
 
@@ -1021,7 +1045,7 @@ contract rewardStation is Ownable, Pausable {
     function claim(uint256 _rewardsAmount, uint256 nonce, bytes memory sig) external notContract {
         
         require(whiteList.onList(msg.sender) ,"The address to be rewarded is not whiteListed");
-        require(_rewardsAmount<MAX_REWARD_AMOUNT ,"The rewarded amount axceeds the maximum limit");
+        require(_rewardsAmount<=MAX_REWARD_AMOUNT ,"The rewarded amount axceeds the maximum limit");
         
         UserInfo storage user = userInfo[msg.sender];
 
@@ -1035,7 +1059,7 @@ contract rewardStation is Ownable, Pausable {
             user.lastRewardDay = block.timestamp;
         }
         
-        require(SafeMath.add(user.todaysWithrawals,_rewardsAmount)<dailyLimit, "with this amount you would acceed the daily limit! Please decrease the amount or contact SpeedProp.");
+        require(SafeMath.add(user.todaysWithrawals,_rewardsAmount)<=dailyLimit, "with this amount you would exceeded the daily limit! Please decrease the amount or contact SpeedProp.");
         //----------------------------------------------------------------
         
         
