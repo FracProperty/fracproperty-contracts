@@ -1,44 +1,4 @@
 // SPDX-License-Identifier: MIT
-pragma solidity  0.8.3;
-
-/**
- * Interface for Timelock Contract
- * Below are the functions used by the multisig contract
- * 
- */
-interface TimeLockController 
-{
-    function schedule(
-        address target,
-        uint256 value,
-        bytes calldata data,
-        bytes32 predecessor,
-        bytes32 salt,
-        uint256 delay
-    ) external;
-
-    function getMinDelay() external view returns (uint256 duration);
-    
-    function hashOperation(
-        address target,
-        uint256 value,
-        bytes calldata data,
-        bytes32 predecessor,
-        bytes32 salt
-    ) external pure returns (bytes32 hash);
-
-    function isOperationReady(bytes32 id) external view returns (bool ready);
-    
-    function cancel(bytes32 id) external;
-    function execute
-    (
-        address target,
-        uint256 value,
-        bytes calldata data,
-        bytes32 predecessor,
-        bytes32 salt
-    ) external payable;
-}
 
 pragma solidity 0.8.3;
 
@@ -53,7 +13,7 @@ import "./Enum.sol";
  * 
  * This contract uses the functionalities provided by Gnosis contracts(OwnerManager, Executor) for Multisig.
 */
-
+ 
 contract FracMultisig  is OwnerManager, Executor{
 
 
@@ -69,7 +29,7 @@ contract FracMultisig  is OwnerManager, Executor{
  * approvals: Number of approvals the transaction has got
  * approvedBy: array of addresses of the owners that have approved the transaction.
 */
-
+ 
 struct TxInfo {
         address addedBy; // total amount of given rewards to the user as a referral.
         string txDesc;
@@ -86,18 +46,21 @@ bytes32 private currentTxHash;
 mapping (address => mapping(uint256 => bool)) private txApproved;
 mapping (uint256 => uint256) private txApprovals;
 mapping (uint256 => TxInfo) private txInfo; 
-bool private nothingToApprove;
-TimeLockController public timeLockController;
+bool private nothingToApproveOrExecute;
+string private constant txStatusApproved="A";
+mapping(uint256 => uint256) public lockTime;
+uint private lockTimePeriod;
+
 
 /**
  * @dev Initializes the contract with primary settings.
 */
-  constructor() 
-  {
+  constructor() {
       address[] memory initOwners = new address[](1);
       initOwners[0] = msg.sender;
       setupOwners(initOwners,1);
-      nothingToApprove = true;
+      nothingToApproveOrExecute = true;
+      lockTimePeriod = 60;
       nonce = 0;
   }
 
@@ -113,14 +76,20 @@ TimeLockController public timeLockController;
     event ApproveTransaction(address _by, address _to, string _txDesc, address _txRelatedTo);
 
     /**
+     * @dev Emitted when a transaction is executed
+     */
+    event ExecuteTransaction(address _by, address _to, string _txDesc, address _txRelatedTo);
+
+    /**
      * @dev Emitted when a transaction is cancelled
      */
     event CancelCurrentTransaction(address _by, address _to, string _txDesc, address _txRelatedTo);
 
     /**
-     * @dev Emitted when a transaction is executed
+     * @dev Emitted when a transaction is cancelled
      */
-    event ExecuteTransaction(address _by, address _to, string _txDesc, address _txRelatedTo);
+    event SetLocktimePeriod(address _by, uint256 _periodInMinutes);
+
 
 
     /**
@@ -131,7 +100,7 @@ TimeLockController public timeLockController;
     {
         return nonce;
     }
-
+    
     /**
      * @dev Returns hash needed for validation check when a transaction is to be processed.
      */
@@ -141,12 +110,29 @@ TimeLockController public timeLockController;
     }
 
 
+
+    /**
+     * @dev set lockTime period.
+     *
+     * 
+     * Emits an {SetLocktimePeriod} event indicating that a locktime period has been changed.
+     *
+     * @param _periodInSeconds The new value for locktime in seconds.
+     * 
+     */
+    
+    function setLocktimePeriod(uint256 _periodInSeconds) external onlyOwner returns(bool _success)
+    {
+        lockTimePeriod = _periodInSeconds;
+        
+        return true;
+    }
+
     /**
      * @dev add new transaction to be approved.
      *
      * 
      * Emits an {AddTransactionAndApprove} event indicating that a transaction is added.
-     * Emits an {ExecuteTransaction} event indicating that an internal multisig function is executed.
      *
      * @param _data the ABI encoding of the function to be executed
      * @param _to the address of the contract that contains the function to be executed
@@ -155,17 +141,17 @@ TimeLockController public timeLockController;
      * @param _txRelatedTo The address of a wallet that could be related to the transaction
      * 
      */
-
-    function addTransactionAndApprove(bytes calldata _data, address _to, string memory _txDesc, string memory _txNote, address _txRelatedTo) external payable onlyOwner returns(uint256)
+    
+    function addTransactionAndApprove(bytes calldata _data, address _to, string memory _txDesc, string memory _txNote, address _txRelatedTo) external payable onlyOwner returns(string memory)
     {
-        require(nothingToApprove, "pending transaction is still waiting for approval");
+        require(nothingToApproveOrExecute, "pending transaction is still waiting for approval or execution!");
         bytes32 txHash = checkHash(msg.sender,_data,_to);
-
+        
         currentTxHash=txHash;
         txApproved[msg.sender][nonce] = true;
 
         TxInfo storage _tx =  txInfo[nonce];
-
+        
         _tx.addedBy = msg.sender; 
         _tx.txDesc = _txDesc;
         _tx.txNote = _txNote;
@@ -174,52 +160,32 @@ TimeLockController public timeLockController;
         _tx.txStatus = "P";
         _tx.approvedBy.push(msg.sender);
         _tx.approvals = _tx.approvals+1;
-
-        txApprovals[nonce] = txApprovals[nonce]+1;
-        nothingToApprove = false;
-
+		
+		txApprovals[nonce] = txApprovals[nonce]+1;
+		nothingToApproveOrExecute = false;
+    
         /* 
-        if only 1 approval is required for a transaction to be executed at the time of adding a new transaction, then 
-        it sould be executed
+        if only 1 approval is required for a transaction  at the time of adding a new transaction, then 
+        it sould be approved
         */
         if(threshold==1)
         {
-            //Here we are checking if the targeted contract is the multisig itself
-            if (_to == address(this))
-            {
-                if (execute(_to, msg.value, _data, Enum.Operation.Call, gasleft()))
-                {
-                    _tx.txStatus = "E";
-                    emit ExecuteTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
-                }
-                else
-                {
-                    _tx.txStatus = "F";
-                }
-                nonce = nonce+1;
-                nothingToApprove = true;
-            }
-            else
-            {
-                // below value of predecessor parameter is used by the schedule function of openzepplin timelock contract
-                // and we will set its value to bytes32(0) because we don't have related transactions 
-                bytes32 predecessor = 0x0000000000000000000000000000000000000000000000000000000000000000;  
-                timeLockController.schedule(_to, msg.value, _data, predecessor, keccak256(abi.encode(nonce)), timeLockController.getMinDelay());
-
-                _tx.txStatus = "A";
-            }
+            _tx.txStatus = "A";
+            lockTime[nonce]= block.timestamp + lockTimePeriod;
         }
-
-        emit AddTransactionAndApprove(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
-        return nonce;
+        
+		emit ApproveTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
+		
+		//Return the current transcation status
+        return _tx.txStatus;
     }
-
+    
     /**
      * @dev Check if any pending transaction is waiting to be approved by the owner
      */
     function pendingForOwnerApproval(address _owner) external view returns(bool)
     {
-        return (!nothingToApprove && (txApproved[_owner][nonce] == false));
+        return (!nothingToApproveOrExecute && (txApproved[_owner][nonce] == false));
     }
 
     /**
@@ -227,8 +193,9 @@ TimeLockController public timeLockController;
      */
     function isInProcessOfApproval() external view returns(bool)
     {
-        return !nothingToApprove;
+        return !nothingToApproveOrExecute;
     }
+    
     
     /**
      * @dev approve the pending transaction.
@@ -241,145 +208,66 @@ TimeLockController public timeLockController;
      * 
      */
 
-    function approveTransaction(bytes calldata _data, address _to) external payable onlyOwner returns(uint256)
+    function approveTransaction(bytes calldata _data, address _to) external payable onlyOwner returns(string memory)
     {
-        require(!nothingToApprove, "no pending transaction is waiting for approval");
-
-        //1 means approved
-        //2 means approved & scheduled
-        //3 means approved & executed sucessfully
-        //4 means approved & executed failed
-        uint256 returnedVal=1;
-
+        require(!nothingToApproveOrExecute, "no pending transaction is waiting for approval or execution");
+        
         TxInfo storage _tx =  txInfo[nonce];
         bytes32 txHash = checkHash(_tx.addedBy,_data,_to);
-
+        
         require((currentTxHash==txHash), "This transaction is not the current transaction for approval!");
         require((txApproved[msg.sender][nonce] == false), "The transaction has already been approved by the owner!");
+        
+		//Check if the transaction status is still pending, meaning to say we can add one another approval
+        if (keccak256(abi.encode(_tx.txStatus))==keccak256(abi.encode("P")))
+		{
+			txApproved[msg.sender][nonce] = true;
+			txApprovals[nonce] = txApprovals[nonce]+1;
+			
+			_tx.approvals = _tx.approvals+1;
+			_tx.approvedBy.push(msg.sender);
+			
+			
+			// if the number of approvals reached the threshold, then we chane the status to "A" means approved
+			if(txApprovals[nonce]>=threshold)
+			{
+				_tx.txStatus = "A";
+				lockTime[nonce]= block.timestamp + lockTimePeriod;
+			}
 
-
-        txApproved[msg.sender][nonce] = true;
-        txApprovals[nonce] = txApprovals[nonce]+1;
-
-        _tx.approvals = _tx.approvals+1;
-        _tx.approvedBy.push(msg.sender);
-
-
-        // if the number of approvals reached the threshold, then execute the function.
-        if(txApprovals[nonce]>=threshold)
-        {
-            // we have reached the minimum required approvals, we need to schudle the transaction using the timelock contract from openzepplin
-
-            //Here we are checking if the targeted contract is the multisig itself
-            if (_to == address(this))
-            {
-                if (execute(_to, msg.value, _data, Enum.Operation.Call, gasleft()))
-                {
-                    _tx.txStatus = "E";
-                    emit ExecuteTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
-                    returnedVal = 3;
-                }
-                else
-                {
-                    _tx.txStatus = "F";
-                    returnedVal = 4;
-                }
-                nonce = nonce+1;
-                nothingToApprove = true;
-            }
-            else
-            {
-                // below value of predecessor parameter is used by the schedule function of openzepplin timelock contract
-                // and we will set its value to bytes32(0) because we don't have related transactions 
-                bytes32 predecessor = 0x0000000000000000000000000000000000000000000000000000000000000000;  
-                timeLockController.schedule(_to, msg.value, _data, predecessor, keccak256(abi.encode(nonce)), timeLockController.getMinDelay());
-            
-                _tx.txStatus = "A";
-                returnedVal = 2;
-            }
-        }
-
-        emit ApproveTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
-        return returnedVal;
+			emit ApproveTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
+		}
+        
+		//Return the current transcation status
+        return _tx.txStatus;
     }
 
 
     /**
-     * @dev cancel the current transaction if it's not executed yet.
+     * @dev cancel the pending transaction.
      *
-     * @param _data the ABI encoding of the function to be executed
      * 
      * Emits a {CancelCurrentTransaction} event indicating that the pending transaction is cancelled.
      * 
      */
-    function cancelCurrentTransaction(bytes calldata _data) external payable onlyOwner returns(bool _success)
+    function cancelCurrentTransaction() external onlyOwner returns(uint256)
     {
-        require(!nothingToApprove, "no pending transaction is waiting for approval/execution");
+        require(!nothingToApproveOrExecute, "no pending transaction is waiting for approval or execution");
 
+        nothingToApproveOrExecute = true;
         TxInfo storage _tx =  txInfo[nonce];
-
-        //Here we are checking if the targeted contract is the multisig itself
-        if (_tx.txTo != address(this) && keccak256(abi.encode(_tx.txStatus))==keccak256(abi.encode("A")))
-        {
-            //Cancel the transaction in the timelock contract
-            // below value of predecessor parameter is used by the schedule function of openzepplin timelock contract
-            // and we will set its value to bytes32(0) because we don't have related transactions 
-            bytes32 predecessor = 0x0000000000000000000000000000000000000000000000000000000000000000;  
-            bytes32 operationHash = timeLockController.hashOperation(_tx.txTo, msg.value, _data, predecessor, keccak256(abi.encode(nonce)));
-            timeLockController.cancel(operationHash);
-        }
-        
-        //Cancel the transaction in the multisig side 
+		
+		//Change the status to "C" which means cancelled
         _tx.txStatus = "C";
+        
+		//Incrase the nonce by one
         nonce=nonce+1; 
-
-        //We are ready to process another transaction
-        nothingToApprove = true;
-
+		
         emit CancelCurrentTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
-        return nothingToApprove;
+        return nonce;
     }
-
-     /**
-     * @dev execute the approved transaction if it's ready on the timelock contract side.
-     *
-     * 
-     * Emits an {ExecuteTransaction} event indicating that the pending transaction is executed by an owner.
-     *
-     * @param _data the ABI encoding of the function to be executed
-     * 
-     */
-
-    function executeTransaction(bytes calldata _data) external payable onlyOwner returns(bool _success)
-    {
-        require(!nothingToApprove, "no pending transaction is waiting for execution");
-        TxInfo storage _tx =  txInfo[nonce];
-        
-        //Check if the trasacation is approved
-        require(keccak256(abi.encode(_tx.txStatus))==keccak256(abi.encode("A")), "the transaction is not approved yet");
-
-        //Check if the transaction is ready to execute
-        // below value of predecessor parameter is used by the schedule function of openzepplin timelock contract
-        // and we will set its value to bytes32(0) because we don't have related transactions 
-        bytes32 predecessor = 0x0000000000000000000000000000000000000000000000000000000000000000;  
-        bytes32 operationHash = timeLockController.hashOperation(_tx.txTo, msg.value, _data, predecessor, keccak256(abi.encode(nonce)));
-        require(timeLockController.isOperationReady(operationHash), "the transaction requires more time to be executable");
-        
-        
-        //Execcute the transaction
-        timeLockController.execute(_tx.txTo, msg.value, _data, predecessor, keccak256(abi.encode(nonce)));
-
-        //Cancel the transaction in the multisig side 
-        _tx.txStatus = "E";
-        nonce=nonce+1; 
-
-        //We are ready to precess another transaction
-        nothingToApprove = true;
-
-        emit ExecuteTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
-        return nothingToApprove;
-    }
-
+    
+    
     /**
      * @dev returns information about a transaction
      */
@@ -388,13 +276,51 @@ TimeLockController public timeLockController;
         TxInfo storage _tx = txInfo[_txId];
         return _tx;
     }
-
-    /*
-    * @dev Allows to update the address of the TimeLockController
-    * @param _timelockContraller New TimeLockContraller address
-    */
-    function setTimelockContract(TimeLockController _timelockContraller) public authorized
+    
+    /**
+     * @dev returns information about a lockTime
+     */
+    function getCurrentTimeInfo(uint _nonce) external view returns(uint256 _timeStamp, uint256 _lockTimePeriod,uint256 _lockTime)
     {
-        timeLockController = _timelockContraller;
+        return (block.timestamp,lockTimePeriod,lockTime[_nonce]);
+        
+    }
+    
+
+
+    /**
+     * @dev execute the approved transaction.
+     *
+     * 
+     * Emits an {ExecuteTransaction} event indicating that the pending transaction is executed by an owner.
+     *
+     * @param _data the ABI encoding of the function to be executed
+     * @param _to the address of the contract that contains the function to be executed
+     * 
+     */
+
+    function executeTransaction(bytes calldata _data, address _to) external payable onlyOwner returns(bool _success)
+    {
+        require(!nothingToApproveOrExecute, "no pending transaction is waiting for approval");
+        TxInfo storage _tx =  txInfo[nonce];
+        bytes32 txHash = checkHash(_tx.addedBy,_data,_to);
+
+        require((currentTxHash==txHash), "This transaction is not the current transaction for approval or execution!");
+        require((keccak256(abi.encode(_tx.txStatus))==keccak256(abi.encode(txStatusApproved))), "This transaction is not in 'Approved' stage!");
+        require(block.timestamp >= lockTime[nonce], "lock time has not expired");
+    
+        bool ret;
+		ret = execute(_to, msg.value, _data, Enum.Operation.Call, gasleft());
+		
+		// change status to 'E': "executed"
+		_tx.txStatus = "E";
+		nothingToApproveOrExecute = true;
+		nonce = nonce+1;
+
+
+        emit ExecuteTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
+        
+        
+        return ret;
     }
 }
