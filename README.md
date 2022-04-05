@@ -1,4 +1,4 @@
-![Frac Property Token (FRAC)](docs/fracproperty_banner.png)
+![Frac Property Token (FRAC)](docs/0909SmallLogo.png)
 
 # Frac Property
 
