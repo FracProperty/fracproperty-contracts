@@ -90,8 +90,6 @@ uint private lockTimePeriod;
      */
     event SetLocktimePeriod(address _by, uint256 _periodInMinutes);
 
-
-
     /**
      * @dev Returns the ID of current transaction.
      */
@@ -109,8 +107,6 @@ uint private lockTimePeriod;
         return keccak256(abi.encode(_owner,_data,nonce,to));
     }
 
-
-
     /**
      * @dev set lockTime period.
      *
@@ -121,11 +117,20 @@ uint private lockTimePeriod;
      * 
      */
     
-    function setLocktimePeriod(uint256 _periodInSeconds) external onlyOwner returns(bool _success)
+    function setLocktimePeriod(uint256 _periodInSeconds) external authorized returns(bool _success)
     {
         lockTimePeriod = _periodInSeconds;
         
         return true;
+    }
+
+    /**
+     * @dev returns the current time lock period in seconds
+     */
+
+    function getLocktimePeriod() external view returns(uint256)
+    {
+        return lockTimePeriod;
     }
 
     /**
@@ -312,14 +317,20 @@ uint private lockTimePeriod;
         bool ret;
 		ret = execute(_to, msg.value, _data, Enum.Operation.Call, gasleft());
 		
-		// change status to 'E': "executed"
-		_tx.txStatus = "E";
+        if (ret==true)
+        {
+		    // change status to 'E': "executed"
+		    _tx.txStatus = "E";
+        }
+        else
+        {
+            // change status to 'F': "failed"
+		    _tx.txStatus = "F";
+        }
 		nothingToApproveOrExecute = true;
 		nonce = nonce+1;
 
-
         emit ExecuteTransaction(msg.sender, _tx.txTo, _tx.txDesc, _tx.relatedTo);
-        
         
         return ret;
     }
