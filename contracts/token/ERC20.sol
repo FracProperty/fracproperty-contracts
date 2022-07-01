@@ -16,7 +16,7 @@ import "../utils/Address.sol";
  * all accounts just by listening to said events. Note that this isn't required by the specification, and other
  * compliant implementations may not do it.
  */
-contract ERC20 is IERC20 {
+ contract ERC20 is IERC20 {
     using SafeMath for uint256;
 
     /** Total supply of tokens in existence. */
@@ -67,7 +67,7 @@ contract ERC20 is IERC20 {
         return true;
     }
 
-    /**
+    /** commented out in order to use safeApprove function instead as Certik report mentioned
      * @dev Approve the passed address to spend the specified amount of tokens on behalf of msg.sender.
      *
      * @notice Only use this function to set the spender allowance to zero.
@@ -82,9 +82,29 @@ contract ERC20 is IERC20 {
      *
      * @param spender The address which will spend the funds.
      * @param value The amount of tokens to be spent.
-     */
+    
     function approve(address spender, uint256 value) public returns (bool) {
         _approve(msg.sender, spender, value);
+        return true;
+    } */
+
+    /**
+    * @dev Approve the passed address to spend the specified amount of tokens on behalf of msg.sender.
+	* We are using safeApprove function where can be used either to set the
+	* allowance to zero or to initiate it
+	* to increase the allowance please use increaseAllowance function
+	* to decrease the allowance please use decreaseAllowance function
+    */
+    function safeApprove(address spender, uint256 value) public returns (bool)
+    {
+        require
+        (
+            (value == 0) || (_allowed[msg.sender][spender] == 0),
+            "SafeERC20: approve from non-zero to non-zero allowance"
+        );
+
+        //We can now call the _approve function
+         _approve(msg.sender, spender, value);
         return true;
     }
 
