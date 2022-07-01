@@ -8,7 +8,11 @@ pragma solidity ^0.4.24;
 interface IERC20 {
     function transfer(address to, uint256 value) external returns (bool);
 
-    function approve(address spender, uint256 value) external returns (bool);
+    //commented out in order to use safeApprove function instead as Certik report mentioned
+    //function approve(address spender, uint256 value) external returns (bool);
+
+    //Added by Mohamad Ghanem on 23th of June 2022
+    function safeApprove(address spender, uint256 value) external returns (bool);
 
     function transferFrom(address from, address to, uint256 value) external returns (bool);
 
