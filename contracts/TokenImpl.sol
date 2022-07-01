@@ -136,13 +136,13 @@ contract TokenImpl is ERC20, Mintable, Burnable, Pausable, Blacklistable, Whitel
         }
     }
 
-    /**
+    /** commented out in order to use safeApprove function instead as Certik report mentioned
      * @dev Extension of the ERC20 approve function to enforce lifecycle behaviours.
      *
      * @notice Only use this function to set the spender allowance to zero.
      * To increment allowed value use the increaseAllowance function.
      * To decrement allowed value use the decreaseAllowance function.
-     */
+    
     function approve(address spender, uint256 value)
         public
         whenNotPaused
@@ -151,6 +151,23 @@ contract TokenImpl is ERC20, Mintable, Burnable, Pausable, Blacklistable, Whitel
         returns (bool)
     {
         return super.approve(spender, value);
+    }*/
+
+    /**
+     * @dev Extension of the ERC20 approve function to enforce lifecycle behaviours.
+     *
+     * @notice Only use this function to set the spender allowance to zero.
+     * To increment allowed value use the increaseAllowance function.
+     * To decrement allowed value use the decreaseAllowance function.
+     */
+    function safeApprove(address spender, uint256 value)
+        public
+        whenNotPaused
+        notBlacklisted(msg.sender)
+        notBlacklisted(spender)
+        returns (bool)
+    {
+        return super.safeApprove(spender, value);
     }
 
     /**
